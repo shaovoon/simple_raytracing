@@ -103,9 +103,9 @@ hitable* random_scene() {
 }
 
 int main() {
-	int nx = 1200;
-	int ny = 800;
-	int ns = 10;
+	int nx = 256;
+	int ny = 256;
+	int ns = 1000;
 	//std::cout << "P3\n" << nx << " " << ny << "\n255\n";
 	hitable* list[5];
 	float R = cos(M_PI / 4);
