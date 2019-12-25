@@ -18,14 +18,12 @@
 
 #include "RandomNumGen.h"
 
-extern RandomNumGen g_RandomNumGen;
-
 #define M_PI 3.14159265358979323846264338327950288
 
 vec3 random_in_unit_disk() {
     vec3 p;
     do {
-        p = 2.0*vec3(g_RandomNumGen.GetRand(), g_RandomNumGen.GetRand(),0) - vec3(1,1,0);
+        p = 2.0*vec3(RandomNumGen::GetRand(), RandomNumGen::GetRand(),0) - vec3(1,1,0);
     } while (dot(p,p) >= 1.0);
     return p;
 }

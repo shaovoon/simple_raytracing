@@ -18,8 +18,6 @@ struct hit_record;
 #include "hitable.h"
 #include "RandomNumGen.h"
 
-extern RandomNumGen g_RandomNumGen;
-
 
 float schlick(float cosine, float ref_idx) {
     float r0 = (1-ref_idx) / (1+ref_idx);
@@ -48,7 +46,7 @@ vec3 reflect(const vec3& v, const vec3& n) {
 vec3 random_in_unit_sphere() {
     vec3 p;
     do {
-        p = 2.0*vec3(g_RandomNumGen.GetRand(), g_RandomNumGen.GetRand(), g_RandomNumGen.GetRand()) - vec3(1,1,1);
+        p = 2.0*vec3(RandomNumGen::GetRand(), RandomNumGen::GetRand(), RandomNumGen::GetRand()) - vec3(1,1,1);
     } while (p.squared_length() >= 1.0);
     return p;
 }
@@ -112,7 +110,7 @@ class dielectric : public material {
                 reflect_prob = schlick(cosine, ref_idx);
              else 
                 reflect_prob = 1.0;
-             if (g_RandomNumGen.GetRand() < reflect_prob)
+             if (RandomNumGen::GetRand() < reflect_prob)
                 scattered = ray(rec.p, reflected);
              else 
                 scattered = ray(rec.p, refracted);

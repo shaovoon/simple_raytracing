@@ -24,8 +24,6 @@
 #include <Gdiplus.h>
 #pragma comment(lib, "gdiplus.lib")
 
-RandomNumGen g_RandomNumGen;
-
 bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 bool SavePngFile(const wchar_t* pszFile, Gdiplus::Bitmap& bmp);
 
@@ -78,15 +76,15 @@ hitable* random_scene() {
 	int i = 1;
 	for (int a = -11; a < 11; a++) {
 		for (int b = -11; b < 11; b++) {
-			float choose_mat = g_RandomNumGen.GetRand();
-			vec3 center(a + 0.9 * g_RandomNumGen.GetRand(), 0.2, b + 0.9 * g_RandomNumGen.GetRand());
+			float choose_mat = RandomNumGen::GetRand();
+			vec3 center(a + 0.9 * RandomNumGen::GetRand(), 0.2, b + 0.9 * RandomNumGen::GetRand());
 			if ((center - vec3(4, 0.2, 0)).length() > 0.9) {
 				if (choose_mat < 0.8) {  // diffuse
-					list[i++] = new sphere(center, 0.2, new lambertian(vec3(g_RandomNumGen.GetRand() * g_RandomNumGen.GetRand(), g_RandomNumGen.GetRand() * g_RandomNumGen.GetRand(), g_RandomNumGen.GetRand() * g_RandomNumGen.GetRand())));
+					list[i++] = new sphere(center, 0.2, new lambertian(vec3(RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand())));
 				}
 				else if (choose_mat < 0.95) { // metal
 					list[i++] = new sphere(center, 0.2,
-						new metal(vec3(0.5 * (1 + g_RandomNumGen.GetRand()), 0.5 * (1 + g_RandomNumGen.GetRand()), 0.5 * (1 + g_RandomNumGen.GetRand())), 0.5 * g_RandomNumGen.GetRand()));
+						new metal(vec3(0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand())), 0.5 * RandomNumGen::GetRand()));
 				}
 				else {  // glass
 					list[i++] = new sphere(center, 0.2, new dielectric(1.5));
@@ -103,9 +101,9 @@ hitable* random_scene() {
 }
 
 int main() {
-	int nx = 256;
-	int ny = 256;
-	int ns = 1000;
+	int nx = 512;
+	int ny = 512;
+	int ns = 10;
 	//std::cout << "P3\n" << nx << " " << ny << "\n255\n";
 	hitable* list[5];
 	float R = cos(M_PI / 4);
@@ -125,63 +123,64 @@ int main() {
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, dist_to_focus);
 
 	Gdiplus::GdiplusStartupInput m_gdiplusStartupInput;
-	ULONG_PTR m_gdiplusToken;
+	ULONG_PTR m_gdiplusToken = NULL;
 
 	using namespace Gdiplus;
 	Gdiplus::GdiplusStartup(&m_gdiplusToken, &m_gdiplusStartupInput, NULL);
-	Bitmap bmp(nx, ny, PixelFormat32bppARGB);
-	BitmapData bitmapData;
-	Rect rect(0, 0, bmp.GetWidth(), bmp.GetHeight());
+	{
+		Bitmap bmp(nx, ny, PixelFormat32bppARGB);
+		BitmapData bitmapData;
+		Rect rect(0, 0, bmp.GetWidth(), bmp.GetHeight());
 
-	bmp.LockBits(
-		&rect,
-		ImageLockModeRead,
-		PixelFormat32bppARGB,
-		&bitmapData);
+		bmp.LockBits(
+			&rect,
+			ImageLockModeRead,
+			PixelFormat32bppARGB,
+			&bitmapData);
 
-	UINT* pixelsSrc = (UINT*)bitmapData.Scan0;
+		UINT* pixelsSrc = (UINT*)bitmapData.Scan0;
 
-	if (!pixelsSrc)
-		return false;
+		if (!pixelsSrc)
+			return false;
 
-	int stride = bitmapData.Stride >> 2;
+		int stride = bitmapData.Stride >> 2;
 
-	timer stopwatch;
-	stopwatch.start("ray_tracer");
-	using namespace Concurrency;
-	parallel_for(0, ny, [&](int j)
-		//for (int j = ny - 1; j >= 0; j--) 
-		{
-			for (int i = 0; i < nx; i++)
+		timer stopwatch;
+		stopwatch.start("ray_tracer");
+		using namespace Concurrency;
+		parallel_for(0, ny, [&](int j)
+			//for (int j = ny - 1; j >= 0; j--) 
 			{
-				vec3 col(0, 0, 0);
-				for (int s = 0; s < ns; s++) {
-					float u = float(i + g_RandomNumGen.GetRand()) / float(nx);
-					float v = float(j + g_RandomNumGen.GetRand()) / float(ny);
-					ray r = cam.get_ray(u, v);
-					col += color(r, world, 0);
+				for (int i = 0; i < nx; i++)
+				{
+					vec3 col(0, 0, 0);
+					for (int s = 0; s < ns; s++) {
+						float u = float(i + RandomNumGen::GetRand()) / float(nx);
+						float v = float(j + RandomNumGen::GetRand()) / float(ny);
+						ray r = cam.get_ray(u, v);
+						col += color(r, world, 0);
+					}
+					col /= float(ns);
+					col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+					int ir = int(255.99 * col[0]);
+					int ig = int(255.99 * col[1]);
+					int ib = int(255.99 * col[2]);
+
+					int index = ((ny - 1) - j) * stride + i;
+					pixelsSrc[index] = (0xff000000 | (ir << 16) | (ig << 8) | ib);
+
+					//std::cout << ir << " " << ig << " " << ib << "\n";
 				}
-				col /= float(ns);
-				col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-				int ir = int(255.99 * col[0]);
-				int ig = int(255.99 * col[1]);
-				int ib = int(255.99 * col[2]);
+				//float complete = ((ny - 1) - j) / (float)ny;
+				//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
+			});
 
-				int index = ((ny - 1) - j) * stride + i;
-				pixelsSrc[index] = (0xff000000 | (ir << 16) | (ig << 8) | ib);
+		stopwatch.stop();
 
-				//std::cout << ir << " " << ig << " " << ib << "\n";
-			}
-			//float complete = ((ny - 1) - j) / (float)ny;
-			//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
-		});
+		bmp.UnlockBits(&bitmapData);
 
-	stopwatch.stop();
-
-	bmp.UnlockBits(&bitmapData);
-
-	SavePngFile(L"c:\\temp\\ray_trace.png", bmp);
-
+		SavePngFile(L"c:\\temp\\ray_trace_sample10.png", bmp);
+	}
 
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
 }
