@@ -101,7 +101,7 @@ std::shared_ptr <hitable>  random_scene() {
 int main() {
 	int nx = 256;
 	int ny = 256;
-	int ns = 100;
+	int ns = 50;
 
 	std::vector<std::shared_ptr <hitable> > list;
 	float R = cos(M_PI / 4);
