@@ -162,7 +162,7 @@ int main() {
 	stopwatch.stop();
 
 	int channels = 4;
-	stbi_write_png("c:\\temp\\ray_trace_stb_sample101.png", nx, ny, channels, pixelsSrc.data(), nx * channels);
+	stbi_write_png("c:\\temp\\ray_trace.png", nx, ny, channels, pixelsSrc.data(), nx * channels);
 
 	return 0;
 }
