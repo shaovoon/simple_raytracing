@@ -23,11 +23,6 @@
 #include <string>
 #include <Windows.h>
 #include <ppl.h>
-#include <Gdiplus.h>
-#pragma comment(lib, "gdiplus.lib")
-
-bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
-bool SavePngFile(const wchar_t* pszFile, Gdiplus::Bitmap& bmp);
 
 class timer
 {
@@ -124,125 +119,45 @@ int main() {
 
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, dist_to_focus);
 
-	Gdiplus::GdiplusStartupInput m_gdiplusStartupInput;
-	ULONG_PTR m_gdiplusToken = NULL;
+	std::vector<unsigned int> pixelsSrc;
+	pixelsSrc.resize(nx * ny);
+	int stride = nx;
 
-	using namespace Gdiplus;
-	Gdiplus::GdiplusStartup(&m_gdiplusToken, &m_gdiplusStartupInput, NULL);
-	{
-		Bitmap bmp(nx, ny, PixelFormat32bppARGB);
-		BitmapData bitmapData;
-		Rect rect(0, 0, bmp.GetWidth(), bmp.GetHeight());
-
-		bmp.LockBits(
-			&rect,
-			ImageLockModeRead,
-			PixelFormat32bppARGB,
-			&bitmapData);
-
-		UINT* pixelsSrc = (UINT*)bitmapData.Scan0;
-
-		if (!pixelsSrc)
-			return false;
-
-		int stride = bitmapData.Stride >> 2;
-
-		timer stopwatch;
-		stopwatch.start("ray_tracer");
-		using namespace Concurrency;
-		parallel_for(0, ny, [&](int j)
-			//for (int j = ny - 1; j >= 0; j--) 
-			{
-				for (int i = 0; i < nx; i++)
-				{
-					vec3 col(0, 0, 0);
-					for (int s = 0; s < ns; s++) {
-						float u = float(i + RandomNumGen::GetRand()) / float(nx);
-						float v = float(j + RandomNumGen::GetRand()) / float(ny);
-						ray r = cam.get_ray(u, v);
-						col += color(r, world, 0);
-					}
-					col /= float(ns);
-					col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-					int ir = int(255.99 * col[0]);
-					int ig = int(255.99 * col[1]);
-					int ib = int(255.99 * col[2]);
-
-					int index = ((ny - 1) - j) * stride + i;
-					pixelsSrc[index] = (0xff000000 | (ir << 16) | (ig << 8) | ib);
-
-					//std::cout << ir << " " << ig << " " << ib << "\n";
-				}
-				//float complete = ((ny - 1) - j) / (float)ny;
-				//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
-			});
-
-		stopwatch.stop();
-
-		for (int j = ny - 1; j >= 0; j--) 
+	timer stopwatch;
+	stopwatch.start("ray_tracer");
+	using namespace Concurrency;
+	parallel_for(0, ny, [&](int j)
+		//for (int j = ny - 1; j >= 0; j--) 
 		{
 			for (int i = 0; i < nx; i++)
 			{
-				int index = ((ny - 1) - j) * stride + i;
+				vec3 col(0, 0, 0);
+				for (int s = 0; s < ns; s++) {
+					float u = float(i + RandomNumGen::GetRand()) / float(nx);
+					float v = float(j + RandomNumGen::GetRand()) / float(ny);
+					ray r = cam.get_ray(u, v);
+					col += color(r, world, 0);
+				}
+				col /= float(ns);
+				col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+				int ir = int(255.99 * col[0]);
+				int ig = int(255.99 * col[1]);
+				int ib = int(255.99 * col[2]);
 
-				unsigned char ir = (pixelsSrc[index] & 0xff0000) >> 16;
-				unsigned char ig = (pixelsSrc[index] & 0xff00) >> 8;
-				unsigned char ib = (pixelsSrc[index] & 0xff);
+				int index = ((ny - 1) - j) * stride + i;
 				pixelsSrc[index] = (0xff000000 | (ib << 16) | (ig << 8) | ir);
 
 				//std::cout << ir << " " << ig << " " << ib << "\n";
 			}
 			//float complete = ((ny - 1) - j) / (float)ny;
 			//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
-		}
+		});
 
-		stbi_write_png("c:\\temp\\ray_trace_stb_sample10.png", nx, ny, 4, bitmapData.Scan0, bitmapData.Stride);
+	stopwatch.stop();
 
-		bmp.UnlockBits(&bitmapData);
+	int channels = 4;
+	stbi_write_png("c:\\temp\\ray_trace_stb_sample101.png", nx, ny, channels, pixelsSrc.data(), nx * channels);
 
-		SavePngFile(L"c:\\temp\\ray_trace_sample10.png", bmp);
-	}
-
-	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+	return 0;
 }
 
-bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
-{
-	UINT  num = 0;          // number of image encoders
-	UINT  size = 0;         // size of the image encoder array in bytes
-
-	using namespace Gdiplus;
-
-	ImageCodecInfo* pImageCodecInfo = NULL;
-
-	GetImageEncodersSize(&num, &size);
-	if (size == 0)
-		return false;  // Failure
-
-	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-	if (pImageCodecInfo == NULL)
-		return false;  // Failure
-
-	GetImageEncoders(num, size, pImageCodecInfo);
-
-	for (UINT j = 0; j < num; ++j)
-	{
-		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
-		{
-			*pClsid = pImageCodecInfo[j].Clsid;
-			free(pImageCodecInfo);
-			return true;  // Success
-		}
-	}
-
-	free(pImageCodecInfo);
-	return false;  // Failure
-}
-
-bool SavePngFile(const wchar_t* pszFile, Gdiplus::Bitmap& bmp)
-{
-	CLSID pngClsid;
-	GetEncoderClsid(L"image/png", &pngClsid);
-	Gdiplus::Status status = bmp.Save(pszFile, &pngClsid, NULL);
-	return status == Gdiplus::Ok ? true : false;
-}
