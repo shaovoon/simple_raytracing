@@ -22,7 +22,9 @@
 #include <chrono>
 #include <string>
 #include <Windows.h>
-#include <ppl.h>
+#include <algorithm>
+#include <execution>
+
 
 class timer
 {
@@ -122,36 +124,41 @@ int main() {
 	std::vector<unsigned int> pixelsSrc;
 	pixelsSrc.resize(nx * ny);
 	int stride = nx;
+	for (int j = ny - 1; j >= 0; j--)
+	{
+		for (int i = 0; i < nx; i++)
+		{
+			int index = ((ny - 1) - j) * stride + i;
+		
+			pixelsSrc[index] = ((i & 0xffff) << 16) | (j & 0xffff);
+		}
+	}
+
 
 	timer stopwatch;
 	stopwatch.start("ray_tracer");
-	using namespace Concurrency;
-	parallel_for(0, ny, [&](int j)
-		//for (int j = ny - 1; j >= 0; j--) 
-		{
-			for (int i = 0; i < nx; i++)
-			{
-				vec3 col(0, 0, 0);
-				for (int s = 0; s < ns; s++) {
-					float u = float(i + RandomNumGen::GetRand()) / float(nx);
-					float v = float(j + RandomNumGen::GetRand()) / float(ny);
-					ray r = cam.get_ray(u, v);
-					col += color(r, world, 0);
-				}
-				col /= float(ns);
-				col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-				int ir = int(255.99 * col[0]);
-				int ig = int(255.99 * col[1]);
-				int ib = int(255.99 * col[2]);
 
-				int index = ((ny - 1) - j) * stride + i;
-				pixelsSrc[index] = (0xff000000 | (ib << 16) | (ig << 8) | ir);
+	std::for_each(std::execution::par, pixelsSrc.begin(), pixelsSrc.end(), [&](unsigned int& pixel) {
+		int j = pixel & 0xffff;
+		int i = (pixel & 0xffff0000) >> 16;
 
-				//std::cout << ir << " " << ig << " " << ib << "\n";
-			}
-			//float complete = ((ny - 1) - j) / (float)ny;
-			//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
-		});
+		vec3 col(0, 0, 0);
+		for (int s = 0; s < ns; s++) {
+			float u = float(i + RandomNumGen::GetRand()) / float(nx);
+			float v = float(j + RandomNumGen::GetRand()) / float(ny);
+			ray r = cam.get_ray(u, v);
+			col += color(r, world, 0);
+		}
+		col /= float(ns);
+		col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+		int ir = int(255.99 * col[0]);
+		int ig = int(255.99 * col[1]);
+		int ib = int(255.99 * col[2]);
+
+		int index = ((ny - 1) - j) * stride + i;
+		pixel = (0xff000000 | (ib << 16) | (ig << 8) | ir);
+
+	});
 
 	stopwatch.stop();
 
