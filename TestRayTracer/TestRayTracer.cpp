@@ -12,20 +12,19 @@
 #include <iostream>
 #include "sphere.h"
 #include "hitable_list.h"
-#include "float.h"
+#include <cfloat>
 #include "camera.h"
 #include "material.h"
 #include "RandomNumGen.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include <iomanip>
 #include <chrono>
 #include <string>
 #include <Windows.h>
-#include <ppl.h>
-#include <Gdiplus.h>
-#pragma comment(lib, "gdiplus.lib")
-
-bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
-bool SavePngFile(const wchar_t* pszFile, Gdiplus::Bitmap& bmp);
+#include <algorithm>
+#include <execution>
+#include <memory>
 
 class timer
 {
@@ -49,7 +48,7 @@ private:
 	std::chrono::high_resolution_clock::time_point begin;
 };
 
-vec3 color(const ray& r, hitable* world, int depth) {
+vec3 color(const ray& r, std::shared_ptr <hitable>& world, int depth) {
 	hit_record rec;
 	if (world->hit(r, 0.001, FLT_MAX, rec)) {
 		ray scattered;
@@ -69,10 +68,9 @@ vec3 color(const ray& r, hitable* world, int depth) {
 }
 
 
-hitable* random_scene() {
-	int n = 500;
-	hitable** list = new hitable * [n + 1];
-	list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(vec3(0.5, 0.5, 0.5)));
+std::shared_ptr <hitable>  random_scene() {
+	std::vector<std::shared_ptr <hitable> > list;
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(0, -1000, 0), 1000, std::shared_ptr<lambertian>(new lambertian(vec3(0.5, 0.5, 0.5))))));
 	int i = 1;
 	for (int a = -11; a < 11; a++) {
 		for (int b = -11; b < 11; b++) {
@@ -80,39 +78,39 @@ hitable* random_scene() {
 			vec3 center(a + 0.9 * RandomNumGen::GetRand(), 0.2, b + 0.9 * RandomNumGen::GetRand());
 			if ((center - vec3(4, 0.2, 0)).length() > 0.9) {
 				if (choose_mat < 0.8) {  // diffuse
-					list[i++] = new sphere(center, 0.2, new lambertian(vec3(RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand())));
+					list.push_back(std::shared_ptr<sphere>(new sphere(center, 0.2, std::shared_ptr<lambertian>(new lambertian(vec3(RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand(), RandomNumGen::GetRand() * RandomNumGen::GetRand()))))));
 				}
 				else if (choose_mat < 0.95) { // metal
-					list[i++] = new sphere(center, 0.2,
-						new metal(vec3(0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand())), 0.5 * RandomNumGen::GetRand()));
+					list.push_back(std::shared_ptr<sphere>(new sphere(center, 0.2,
+						std::shared_ptr<metal>(new metal(vec3(0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand()), 0.5 * (1 + RandomNumGen::GetRand())), 0.5 * RandomNumGen::GetRand())))));
 				}
 				else {  // glass
-					list[i++] = new sphere(center, 0.2, new dielectric(1.5));
+					list.push_back(std::shared_ptr<sphere>(new sphere(center, 0.2, std::shared_ptr<dielectric>(new dielectric(1.5)))));
 				}
 			}
 		}
 	}
 
-	list[i++] = new sphere(vec3(0, 1, 0), 1.0, new dielectric(1.5));
-	list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(vec3(0.4, 0.2, 0.1)));
-	list[i++] = new sphere(vec3(4, 1, 0), 1.0, new metal(vec3(0.7, 0.6, 0.5), 0.0));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(0, 1, 0), 1.0, std::shared_ptr<dielectric>(new dielectric(1.5)))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(-4, 1, 0), 1.0, std::shared_ptr<lambertian>(new lambertian(vec3(0.4, 0.2, 0.1))))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(4, 1, 0), 1.0, std::shared_ptr<metal>(new metal(vec3(0.7, 0.6, 0.5), 0.0)))));
 
-	return new hitable_list(list, i);
+	return std::shared_ptr <hitable_list>(new hitable_list(list));
 }
 
 int main() {
-	int nx = 512;
-	int ny = 512;
-	int ns = 10;
-	//std::cout << "P3\n" << nx << " " << ny << "\n255\n";
-	hitable* list[5];
+	int nx = 256;
+	int ny = 256;
+	int ns = 100;
+
+	std::vector<std::shared_ptr <hitable> > list;
 	float R = cos(M_PI / 4);
-	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
-	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
-	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2), 0.0));
-	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
-	list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
-	hitable* world = new hitable_list(list, 5);
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(0, 0, -1), 0.5, std::shared_ptr<lambertian>(new lambertian(vec3(0.1, 0.2, 0.5))))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(0, -100.5, -1), 100, std::shared_ptr<lambertian>(new lambertian(vec3(0.8, 0.8, 0.0))))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(1, 0, -1), 0.5, std::shared_ptr<metal>(new metal(vec3(0.8, 0.6, 0.2), 0.0)))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(-1, 0, -1), 0.5, std::shared_ptr<dielectric>(new dielectric(1.5)))));
+	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(-1, 0, -1), -0.45, std::shared_ptr<dielectric>(new dielectric(1.5)))));
+	std::shared_ptr <hitable> world = std::shared_ptr <hitable_list>(new hitable_list(list));
 	world = random_scene();
 
 	vec3 lookfrom(13, 2, 3);
@@ -122,106 +120,50 @@ int main() {
 
 	camera cam(lookfrom, lookat, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, dist_to_focus);
 
-	Gdiplus::GdiplusStartupInput m_gdiplusStartupInput;
-	ULONG_PTR m_gdiplusToken = NULL;
-
-	using namespace Gdiplus;
-	Gdiplus::GdiplusStartup(&m_gdiplusToken, &m_gdiplusStartupInput, NULL);
+	std::vector<unsigned int> pixelsSrc;
+	pixelsSrc.resize(nx * ny);
+	int stride = nx;
+	for (int j = ny - 1; j >= 0; j--)
 	{
-		Bitmap bmp(nx, ny, PixelFormat32bppARGB);
-		BitmapData bitmapData;
-		Rect rect(0, 0, bmp.GetWidth(), bmp.GetHeight());
-
-		bmp.LockBits(
-			&rect,
-			ImageLockModeRead,
-			PixelFormat32bppARGB,
-			&bitmapData);
-
-		UINT* pixelsSrc = (UINT*)bitmapData.Scan0;
-
-		if (!pixelsSrc)
-			return false;
-
-		int stride = bitmapData.Stride >> 2;
-
-		timer stopwatch;
-		stopwatch.start("ray_tracer");
-		using namespace Concurrency;
-		parallel_for(0, ny, [&](int j)
-			//for (int j = ny - 1; j >= 0; j--) 
-			{
-				for (int i = 0; i < nx; i++)
-				{
-					vec3 col(0, 0, 0);
-					for (int s = 0; s < ns; s++) {
-						float u = float(i + RandomNumGen::GetRand()) / float(nx);
-						float v = float(j + RandomNumGen::GetRand()) / float(ny);
-						ray r = cam.get_ray(u, v);
-						col += color(r, world, 0);
-					}
-					col /= float(ns);
-					col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
-					int ir = int(255.99 * col[0]);
-					int ig = int(255.99 * col[1]);
-					int ib = int(255.99 * col[2]);
-
-					int index = ((ny - 1) - j) * stride + i;
-					pixelsSrc[index] = (0xff000000 | (ir << 16) | (ig << 8) | ib);
-
-					//std::cout << ir << " " << ig << " " << ib << "\n";
-				}
-				//float complete = ((ny - 1) - j) / (float)ny;
-				//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
-			});
-
-		stopwatch.stop();
-
-		bmp.UnlockBits(&bitmapData);
-
-		SavePngFile(L"c:\\temp\\ray_trace_sample10.png", bmp);
-	}
-
-	Gdiplus::GdiplusShutdown(m_gdiplusToken);
-}
-
-bool GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
-{
-	UINT  num = 0;          // number of image encoders
-	UINT  size = 0;         // size of the image encoder array in bytes
-
-	using namespace Gdiplus;
-
-	ImageCodecInfo* pImageCodecInfo = NULL;
-
-	GetImageEncodersSize(&num, &size);
-	if (size == 0)
-		return false;  // Failure
-
-	pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-	if (pImageCodecInfo == NULL)
-		return false;  // Failure
-
-	GetImageEncoders(num, size, pImageCodecInfo);
-
-	for (UINT j = 0; j < num; ++j)
-	{
-		if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
+		for (int i = 0; i < nx; i++)
 		{
-			*pClsid = pImageCodecInfo[j].Clsid;
-			free(pImageCodecInfo);
-			return true;  // Success
+			int index = ((ny - 1) - j) * stride + i;
+		
+			pixelsSrc[index] = ((i & 0xffff) << 16) | (j & 0xffff);
 		}
 	}
 
-	free(pImageCodecInfo);
-	return false;  // Failure
+
+	timer stopwatch;
+	stopwatch.start("ray_tracer");
+
+	std::for_each(std::execution::par, pixelsSrc.begin(), pixelsSrc.end(), [&](unsigned int& pixel) {
+		int j = pixel & 0xffff;
+		int i = (pixel & 0xffff0000) >> 16;
+
+		vec3 col(0, 0, 0);
+		for (int s = 0; s < ns; s++) {
+			float u = float(i + RandomNumGen::GetRand()) / float(nx);
+			float v = float(j + RandomNumGen::GetRand()) / float(ny);
+			ray r = cam.get_ray(u, v);
+			col += color(r, world, 0);
+		}
+		col /= float(ns);
+		col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
+		int ir = int(255.99 * col[0]);
+		int ig = int(255.99 * col[1]);
+		int ib = int(255.99 * col[2]);
+
+		int index = ((ny - 1) - j) * stride + i;
+		pixel = (0xff000000 | (ib << 16) | (ig << 8) | ir);
+
+	});
+
+	stopwatch.stop();
+
+	int channels = 4;
+	stbi_write_png("c:\\temp\\ray_trace.png", nx, ny, channels, pixelsSrc.data(), nx * channels);
+
+	return 0;
 }
 
-bool SavePngFile(const wchar_t* pszFile, Gdiplus::Bitmap& bmp)
-{
-	CLSID pngClsid;
-	GetEncoderClsid(L"image/png", &pngClsid);
-	Gdiplus::Status status = bmp.Save(pszFile, &pngClsid, NULL);
-	return status == Gdiplus::Ok ? true : false;
-}
