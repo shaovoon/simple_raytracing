@@ -16,6 +16,8 @@
 #include "camera.h"
 #include "material.h"
 #include "RandomNumGen.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include <iomanip>
 #include <chrono>
 #include <string>
@@ -101,9 +103,9 @@ hitable* random_scene() {
 }
 
 int main() {
-	int nx = 512;
-	int ny = 512;
-	int ns = 10;
+	int nx = 256;
+	int ny = 256;
+	int ns = 500;
 	//std::cout << "P3\n" << nx << " " << ny << "\n255\n";
 	hitable* list[5];
 	float R = cos(M_PI / 4);
@@ -113,7 +115,7 @@ int main() {
 	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
 	list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
 	hitable* world = new hitable_list(list, 5);
-	world = random_scene();
+	//world = random_scene();
 
 	vec3 lookfrom(13, 2, 3);
 	vec3 lookat(0, 0, 0);
@@ -176,6 +178,25 @@ int main() {
 			});
 
 		stopwatch.stop();
+
+		for (int j = ny - 1; j >= 0; j--) 
+		{
+			for (int i = 0; i < nx; i++)
+			{
+				int index = ((ny - 1) - j) * stride + i;
+
+				unsigned char ir = (pixelsSrc[index] & 0xff0000) >> 16;
+				unsigned char ig = (pixelsSrc[index] & 0xff00) >> 8;
+				unsigned char ib = (pixelsSrc[index] & 0xff);
+				pixelsSrc[index] = (0xff000000 | (ib << 16) | (ig << 8) | ir);
+
+				//std::cout << ir << " " << ig << " " << ib << "\n";
+			}
+			//float complete = ((ny - 1) - j) / (float)ny;
+			//std::cout << "Complete:" << (complete * 100.0f) << std::endl;
+		}
+
+		stbi_write_png("c:\\temp\\ray_trace_stb_sample10.png", nx, ny, 4, bitmapData.Scan0, bitmapData.Stride);
 
 		bmp.UnlockBits(&bitmapData);
 
