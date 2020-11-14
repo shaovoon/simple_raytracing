@@ -21,7 +21,6 @@
 #include <iomanip>
 #include <chrono>
 #include <string>
-#include <Windows.h>
 #include <algorithm>
 #include <execution>
 #include <memory>
@@ -103,6 +102,9 @@ int main() {
 	int ny = 256;
 	int ns = 50;
 
+	timer stopwatch;
+	stopwatch.start("ray_tracer_init");
+
 	std::vector<std::shared_ptr <hitable> > list;
 	float R = cos(M_PI / 4);
 	list.push_back(std::shared_ptr<sphere>(new sphere(vec3(0, 0, -1), 0.5, std::shared_ptr<lambertian>(new lambertian(vec3(0.1, 0.2, 0.5))))));
@@ -132,9 +134,8 @@ int main() {
 			pixelsSrc[index] = ((i & 0xffff) << 16) | (j & 0xffff);
 		}
 	}
+	stopwatch.stop();
 
-
-	timer stopwatch;
 	stopwatch.start("ray_tracer");
 
 	std::for_each(std::execution::par, pixelsSrc.begin(), pixelsSrc.end(), [&](unsigned int& pixel) {
