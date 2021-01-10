@@ -1,4 +1,4 @@
-# simple_raytracing
+# Ray Tracing in One Weekend with C++17 Parallel for_each
 
 The (free) ebook and code are from [Raytracing in a weekend Github](https://github.com/RayTracing/raytracing.github.io), amended with some changes to compile in VC++ to run on Windows.
 
